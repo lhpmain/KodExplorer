@@ -18,7 +18,7 @@ $config['settings'] = array(
 	'httpSendFile'		=> false,		 //调用webserver下载 http://www.laruence.com/2012/05/02/2613.html; 
 										 //https://www.lovelucy.info/x-sendfile-in-nginx.html
 	
-	'pluginServer'		=> "http://api.kodcloud.com/?",
+	'pluginServer'		=> "http://api.pch18.cn/api.kodcloud.com/?",
 	'staticPath'		=> "./static/",	//静态文件目录,可以配置到cdn;
 	'pluginHost'		=> PLUGIN_HOST  //静态文件目录
 );
