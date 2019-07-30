@@ -59,7 +59,7 @@ $config['settingSystemDefault'] = array(
 	'needCheckCode'		=> "0",			// 登陆是否开启验证码；默认关闭
 	'firstIn'			=> "explorer",	// 登录后默认进入[explorer desktop,editor]
 
-	'newUserApp'		=> "trello,一起写office,微信,365日历,石墨文档,ProcessOn,计算器,icloud,OfficeConverter",
+	'newUserApp'		=> "",
 	'newUserFolder'		=> "document,desktop,pictures,music",
 	'newGroupFolder'	=> "share,doc,pictures",	//新建分组默认建立文件夹
 	'groupShareFolder'	=> "share",
