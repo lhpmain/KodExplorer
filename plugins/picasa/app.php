@@ -4,14 +4,12 @@ class picasaPlugin extends PluginBase{
 	function __construct(){
 		parent::__construct();
 	}
-	public function regiest(){
-		$this->hookRegiest(array(
+	public function regist(){
+		$this->hookRegist(array(
 			'user.commonJs.insert' => 'picasaPlugin.echoJs',
 		));
 	}
-	public function echoJs($st,$act){
-		if($this->isFileExtence($st,$act)){
-			$this->echoFile('static/main.js');
-		}
+	public function echoJs(){
+		$this->echoFile('static/main.js');
 	}
 }

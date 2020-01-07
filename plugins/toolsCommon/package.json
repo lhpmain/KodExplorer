@@ -5,13 +5,12 @@
 	"version":"1.1",
 	"hidden":1,
 	"source":{
-		"className":"x-item-file x-ini"
+		"className":"x-item-icon x-ini"
 	},
 	"description":"some configs",
 	"auther":{
 		"copyright":"kodcloud.",
 		"homePage":"http://www.kodcloud.com",
 	},
-	"configItem":{
-	}
+	"configItem":{}
 }

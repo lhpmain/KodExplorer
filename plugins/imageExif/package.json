@@ -1,13 +1,13 @@
 {
 	"id":"imageExif",
-	"name":"{{LNG.imageExif.meta.name}}",
-	"title":"{{LNG.imageExif.meta.title}}",
-	"version":"1.2",
+	"name":"{{LNG['imageExif.meta.name']}}",
+	"title":"{{LNG['imageExif.meta.title']}}",
+	"version":"1.4",
 	"category":"media",
 	"source":{
 		"className":"font-icon icon-info bg-blue-7"
 	},
-	"description":"{{LNG.imageExif.meta.desc}}",
+	"description":"{{LNG['imageExif.meta.desc']}}",
 
 	"auther":{
 		"copyright":"kodcloud",
@@ -17,9 +17,9 @@
 		"formStyle":{"className":"form-box-title-right"},
 		"pluginAuth":{
 			"type":"userSelect",
-			"value":"all:1",
-			"display":"{{LNG.Plugin.config.auth}}",
-			"desc":"{{LNG.Plugin.config.authDesc}}",
+			"value":{"all":1},
+			"display":"{{LNG['admin.plugin.auth']}}",
+			"desc":"{{LNG['admin.plugin.authDesc']}}",
 			"require":1
 		}
 	}

@@ -2,18 +2,18 @@
 * body {height: 100%; overflow-y: auto}
 * html{overflow-x: auto; overflow-y: hidden}
 /* www.codefans.net */
-#PicasaMask {position: fixed; _position: absolute; z-index: 100; top: 0; left: 0; 
+#PicasaMask {position: fixed; _position: absolute; z-index: 10000; top: 0; left: 0; 
 background: #000; overflow: hidden;}
 
 
-#PV_Close{position: fixed; _position: absolute; z-index: 200; right:-70px; top:-75px;height:140px;
+#PV_Close{position: fixed; _position: absolute; z-index: 10001; right:-70px; top:-75px;height:140px;
 width:140px;text-decoration:none;background:#000;border-radius:70px;opacity:0.4;filter:alpha(opacity=40);}
 #PV_Close span{display:block;margin-top:75px;margin-left:35px;color:#fff;
 font-size:35px;font-family: Arial, sans-serif;}
 #PV_Close:hover{opacity:0.6;filter:alpha(opacity=80);}
 #PV_Close:hover span{color:#f30;}
 #PV_Picture_Temp {display: none;}
-#PicasaView {position: fixed; _position: absolute; z-index: 200; left: 0; top: 0; overflow: hidden}
+#PicasaView {position: fixed; _position: absolute; z-index: 10000; left: 0; top: 0;}
 	#PV_Picture {position: absolute; z-index: 0; cursor: move;
 	-webkit-box-reflect: below 1px -webkit-gradient(linear,left top,left bottom,from(transparent),color-stop(80%,transparent),color-stop(70%,rgba(255,255,255,0)),to(rgba(255,255,255,0.3)));
 }
@@ -24,9 +24,19 @@ font-size:35px;font-family: Arial, sans-serif;}
 
 	#PV_PerHint {position: absolute; z-index: 3;margin-top: 5%; width: 62px; height: 28px; text-align: center; font: bold 13px/28px Tahoma; color: #fff; background:#000;border-radius:4px;opacity:0.4;filter:alpha(opacity=40); cursor: default}
 	#PV_Hint {position: absolute; z-index: 3; height: 25px; color: #fff; font: 12px/25px Tahoma, "ËÎÌå"; text-align: center}
-	#PV_Control {position: absolute; z-index: 4; height: 54px; background:rgba(0,0,0,0.6); border-top: solid 1px #000; overflow: hidden;}
-		#PV_Items {position: absolute; z-index: 5; padding: 1px 0 0; margin: 0; list-style: none; height: 60px; overflow: hidden;}
-			#PV_Items li {float: left; width: 36px; padding: 0; margin: 0; list-style: none; cursor: pointer;position: relative;}
+	#PV_Control {position: absolute; z-index: 4; height: 54px; background:rgba(0,0,0,0.6); border-top: solid 1px #000; }
+		#PV_Items {position: absolute; z-index: 5; padding: 1px 0 0; margin: 0; list-style: none; height: 60px;}
+			#PV_Items li {
+				float: left; width: 36px; padding: 0; margin: 0; 
+				list-style: none; cursor: pointer;position: relative;
+				transition: all 0.2s;
+			}
+			#PV_Items li.current {
+				box-shadow: 0 0 10px #fff;
+				z-index: 10;
+				width: 35px;
+				transform: scale(1.4);
+			}
 			#PV_Items img {border: none; width: 35px; height: 35px;-webkit-box-reflect: below 1px -webkit-gradient(linear,left top,left bottom,from(transparent),color-stop(20%,transparent),color-stop(60%,rgba(255,255,255,0.1)),to(rgba(255,255,255,0.8)));}
 		#PV_Buttons {position: absolute; z-index: 6; margin: 20px auto 0 auto}
 			#PV_Buttons a {float: left; color: #808080; text-align: center; text-decoration: none}
@@ -83,7 +93,7 @@ font-size:35px;font-family: Arial, sans-serif;}
 }
 
 #PV_Items li.current:after {
-    box-shadow: 0 0 30px #fff inset;
+    box-shadow: 0 0 30px #f30 inset;
     content: "+";
     position: absolute;
     z-index: 99;

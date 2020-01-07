@@ -19,22 +19,22 @@
 	"configItem":{
 		"pluginAuth":{
 			"type":"userSelect",
-			"value":"all:1",
-			"display":"{{LNG.Plugin.config.auth}}",
-			"desc":"{{LNG.Plugin.config.authDesc}}",
+			"value":{"all":1},
+			"display":"{{LNG['admin.plugin.auth']}}",
+			"desc":"{{LNG['admin.plugin.authDesc']}}",
 			"require":1
 		},
 
 		"fileExt":{
 			"type":"tags",
-			"display":"{{LNG.Plugin.Config.fileExt}}",
-			"desc":"{{LNG.Plugin.Config.fileExtDesc}}",
+			"display":"{{LNG['admin.plugin.fileExt']}}",
+			"desc":"{{LNG['admin.plugin.fileExtDesc']}}",
 			"value":"mp3,wav,m4a,aac,oga,ogg,webma,mp4,m4v,flv,mov,f4v,ogv,webm,webmv,m3u8a,m3ua,flac,fla,rtmp,rtmpa",
 		},
 		"fileSort":{
 			"type":"number",
-			"display":"{{LNG.Plugin.Config.fileSort}}",
-			"desc":"{{LNG.Plugin.Config.fileSortDesc}}",
+			"display":"{{LNG['admin.plugin.fileSort']}}",
+			"desc":"{{LNG['admin.plugin.fileSortDesc']}}",
 			"value":10,
 		}
 	}

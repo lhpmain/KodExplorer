@@ -70,9 +70,9 @@ function http_type(){
 
 function get_host() {
 	//兼容子目录反向代理:只能是前端js通过cookie传入到后端进行处理
-	if(defined('GLOBAL_DEBUG') && isset($_COOKIE['HOST']) && isset($_COOKIE['APP_HOST'])){
-		return $_COOKIE['HOST'];
-	}
+	// if(defined('GLOBAL_DEBUG') && isset($_COOKIE['HOST']) && isset($_COOKIE['APP_HOST'])){
+	// 	// return $_COOKIE['HOST'];
+	// }
 	$protocol = http_type().'://';
 	$url_host = $_SERVER['SERVER_NAME'].($_SERVER['SERVER_PORT']=='80' ? '' : ':'.$_SERVER['SERVER_PORT']);
 	$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : $url_host;
@@ -87,18 +87,18 @@ function this_url(){
 
 //解决部分主机不兼容问题
 function webroot_path($basic_path){
-	$webRoot = str_replace($_SERVER['SCRIPT_NAME'],'',$_SERVER['SCRIPT_FILENAME']);
-	$webRoot = rtrim(str_replace(array('\\','\/\/','\\\\'),'/',$webRoot),'/').'/';
-	if( substr($basic_path,0,strlen($webRoot)) == $webRoot ){
-		return $webRoot;
+	$index = path_clear(BASIC_PATH.'index.php');
+	$uri   = path_clear($_SERVER["DOCUMENT_URI"]);
+	if( substr($index,- strlen($uri) ) == $uri){
+		$path = substr($index,0,strlen($index)-strlen($uri));
+		return rtrim($path,'/').'/';
 	}
-
-	$webRoot = $_SERVER['DOCUMENT_ROOT'];
-	$webRoot = rtrim(str_replace(array('\\','\/\/','\\\\'),'/',$webRoot),'/').'/';
-	if( substr($basic_path,0,strlen($webRoot)) == $webRoot ){
-		return $webRoot;
+	$uri = path_clear($_SERVER["SCRIPT_NAME"]);
+	if( substr($index,- strlen($uri) ) == $uri){
+		$path = substr($index,0,strlen($index)-strlen($uri));
+		return rtrim($path,'/').'/';
 	}
-	return $basic_path;
+	return $_SERVER['DOCUMENT_ROOT'];
 }
 
 function ua_has($str){
@@ -139,7 +139,7 @@ function http_close(){
 		ob_start();
 		echo str_pad('',1024*5);
 		ob_end_flush();
-		flush();		
+		flush();
 	}
 }
 
@@ -169,22 +169,30 @@ function parse_headers($raw_headers){
 	return $headers;
 }
 
+function cacheProgress($cacheKey, $data = ''){
+	$cacheData = array(
+		'data' => $data,
+		'time' => time()
+	);
+	// $initData = Cache::get($cacheKey);
+	// if($data === '' && !empty($initData['data'])){
+	// 	$cacheData['data'] = $initData['data'];
+	// }
+	return Cache::set($cacheKey, $cacheData);
+}
+
 //多人同时上传同一个文件；或上传到多个服务;
 $curlCurrentFile = false;
 function curl_progress_bind($file,$uuid='',$download=false){
 	if(!$GLOBALS['curlCurrentFile']){
-		$cacheFile = TEMP_PATH.'/curlProgress/'.md5($file.$uuid).'.log';
-		mk_dir(get_path_father($cacheFile));
-		@touch($cacheFile);
-		if(!file_exists($cacheFile)){
-			return;
-		}
+		$cacheKey = md5("{$file}{$uuid}.log");
+		if(!cacheProgress($cacheKey)) return;
 		$GLOBALS['curlCurrentFile'] = array(
-			'path'		 => $file,
+			'path'		 => $file,		// 本地文件
 			'uuid'		 => $uuid,
 			'time'		 => 0,
 			'setNum'	 => 0,
-			'cacheFile'	 => $cacheFile,
+			'cacheKey'	 => $cacheKey,	// 日志信息存缓存
 			'download' 	 => $download
 		);
 	}
@@ -193,14 +201,15 @@ function curl_progress_bind($file,$uuid='',$download=false){
 function curl_progress_set(){
 	$fileInfo = $GLOBALS['curlCurrentFile'];
 	$file = $fileInfo['path'];
-	$cacheFile = $fileInfo['cacheFile'];
+	$cacheKey = $fileInfo['cacheKey'];
 	if( !is_array($fileInfo) || 
 		mtime() - $fileInfo['time'] <= 0.3){//每300ms做一次记录
 		return;
 	}
 	//进度文件被删除则终止传输;
 	clearstatcache();
-	if( !file_exists($cacheFile) || 
+	$cacheInfo = Cache::get($cacheKey);
+	if( $cacheInfo === false || 
 		!file_exists($file) ){
 		exit;
 	}
@@ -237,13 +246,10 @@ function curl_progress_set(){
 		'speed'			=> 0,
 		'logList'		=> array()
 	);
-	//write_log(array($args,$size,$sizeSuccess),'ttt');
-	if(time() - filemtime($cacheFile) <= 10){//10s内才处理;同一个文件
-		$data = @json_decode(file_get_contents($cacheFile),true);
-		$json = $data?$data:$json;
+	if(time() - $cacheInfo['time'] <= 30){//10s内才处理;同一个文件	TODO
+		$json = $cacheInfo['data']?$cacheInfo['data']:$json;
 	}else{
-		del_file($cacheFile);
-		touch($cacheFile);
+		cacheProgress($cacheKey);
 	}
 
 	//更新数据
@@ -283,17 +289,15 @@ function curl_progress_set(){
 	$json['timeUse']  		= time() - $json['timeStart'];
 	$json['timeNeed'] 		= intval($timeNeed);
 	$json['speed'] = intval($speed);
-	file_put_contents($cacheFile,json_encode($json));
+
+	cacheProgress($cacheKey, $json);
 }
 function curl_progress_get($file,$uuid=''){
-	$cacheFile = TEMP_PATH.'/curlProgress/'.md5($file.$uuid).'.log';
-	if(!file_exists($cacheFile) || $file == ''){
-		return -1;
-	}
-	$data = @json_decode(file_get_contents($cacheFile),true);
-	if(is_array($data)){
-		unset($data['logList']);
-		return $data;
+	$cacheKey = md5("{$file}{$uuid}.log");
+	if(!$data = Cache::get($cacheKey)) return -1;
+	if(isset($data['data']) && is_array($data['data'])){
+		unset($data['data']['logList']);
+		return $data['data'];
 	}
 	return -3;
 }
@@ -436,7 +440,7 @@ function url_request($url,$method='GET',$data=false,$headers=false,$options=fals
 	$http_header = substr($response, 0, $header_size);
 	$http_header = parse_headers($http_header);
 	if(is_array($http_header)){
-		// $http_header['kod_add_request_url'] = $url;
+		$http_header['kod_add_request_url'] = $url;
 	}
 	//error
 	if($response_info['http_code'] == 0){
@@ -455,7 +459,7 @@ function url_request($url,$method='GET',$data=false,$headers=false,$options=fals
 
 	curl_close($ch);
 	if(is_array($GLOBALS['curlCurrentFile'])){
-		@unlink($GLOBALS['curlCurrentFile']['cacheFile']);
+		Cache::remove($GLOBALS['curlCurrentFile']['cacheKey']);
 	}
 	$success = $response_info['http_code'] >= 200 && $response_info['http_code'] <= 299;
 	if( $json && $success){
@@ -601,8 +605,7 @@ function url_header($url){
 	if(isset($header['x-outfilename'])){
 		$name = $header['x-outfilename'];
 	}
-	$name = rawurldecode(trim($name,'"'));
-	$name = str_replace(array('/','\\'),'-',$name);//safe;
+	$name = str_replace(array('/','\\'),'-',rawurldecode($name));//safe;
 	$supportRange = isset($header["accept-ranges"])?true:false;
 	if(!request_url_safe($fileUrl)){
 		$fileUrl = "";
@@ -610,7 +613,7 @@ function url_header($url){
 	$result = array(
 		'url' 		=> $fileUrl,
 		'length' 	=> $length,
-		'name' 		=> $name,
+		'name' 		=> trim($name,'"'),
 		'supportRange' => $supportRange && ($length!=0),
 		'all'		=> $header,
 	);
@@ -663,13 +666,19 @@ function parse_url_query($url){
 	$params = array();
 	foreach ($queryParts as $param) {
 		$item = explode('=', $param);
-		$params[$item[0]] = $item[1];
+		// $params[$item[0]] = $item[1];
+		$key = $item[0]; unset($item[0]);
+        $params[$key] = implode('=', $item);
 	}
 	return $params;
 }
 
-function stripslashes_deep($value){ 
-	$value = is_array($value) ? array_map('stripslashes_deep', $value) : (isset($value) ? stripslashes($value) : null); 
+function stripslashes_deep($value){
+	if(is_array($value)){
+		$value = array_map('stripslashes_deep', $value);
+	}else{
+		$value = isset($value) ? rawurldecode(stripslashes($value)) : null;
+	}
 	return $value; 
 }
 
@@ -708,8 +717,15 @@ function parse_incoming(){
 	$_POST	 = stripslashes_deep($_POST);
 	$return = array();
 	$return = array_merge($_GET,$_POST);
+
 	$remote = array_get_index($return,0);
-	$remote = explode('/',trim($remote[0],'/'));
+	$router = trim($remote[0],'/');
+	preg_match_all('/[0-9a-zA-Z\/_]*/',$router,$arr);
+    $router = join('',$arr[0]);
+    $router = str_replace('/','.',$router);
+	$remote = explode('.',$router);
+	
+	$return['URLrouter'] = $router;
 	$return['URLremote'] = $remote;
 	return $return;
 } 
@@ -746,7 +762,7 @@ function in($name,$default='',$filter=null) {
 		case 'request' :   $input =& $_REQUEST;   break;
 
 		case 'put'     :   parse_str(file_get_contents('php://input'), $input);break;
-		case 'session' :   $input =& $_SESSION;   break;
+		case 'session' :   $input =Session::get();   break;
 		case 'cookie'  :   $input =& $_COOKIE;    break;
 		case 'server'  :   $input =& $_SERVER;    break;
 		case 'globals' :   $input =& $GLOBALS;    break;
@@ -934,6 +950,34 @@ function get_os (){
 	return $os;
 }
 
+function get_broswer(){
+    $agent = $_SERVER['HTTP_USER_AGENT']; //获取用户代理字符串
+    $preg_find = array(
+        "Firefox" => array("/Firefox\/([^;)]+)+/i"),
+        "Maxthon" => array("/Maxthon\/([\d\.]+)/", "傲游"),
+        "MSIE" => array("/MSIE\s+([^;)]+)+/i", "IE"),
+        "OPR" => array("/OPR\/([\d\.]+)/", "Opera"),
+        "Edge" => array("/Edge\/([\d\.]+)/"),
+        "Chrome" => array("/Chrome\/([\d\.]+)/"),
+        "rv:" => array("/rv:([\d\.]+)/", "IE", 'Gecko'),
+    );
+    $broswer = '';
+    foreach ($preg_find as $key => $value) {
+        if (stripos($agent, $key)) {
+            if (count($value) == 3) {
+                if (!stripos($agent, $value[2])) {
+                    break;
+                }
+            }
+            $name = count($value) == 1 ? $key : $value[1];
+            preg_match($value[0], $agent, $match);
+            $broswer = $name . '(' . $match[1] . ')';
+        }
+    }
+    if ($broswer == '') {$broswer = "Unknown";}
+    return $broswer;
+}
+
 // 浏览器是否直接打开
 function mime_support($mime){
 	$arr_start = array(
@@ -1098,6 +1142,8 @@ function get_file_mime($ext){
 		"pps" => "application/vnd.ms-powerpoint",
 		"ppt" => "application/vnd.ms-powerpoint",
 		"pptx" => "application/vnd.ms-powerpoint",
+		"plist"=> "text/xml",
+		"ipa" =>"application/octet-stream",
 		"prf" => "application/pics-rules",
 		"ps" => "application/postscript",
 		"pub" => "application/x-mspublisher",

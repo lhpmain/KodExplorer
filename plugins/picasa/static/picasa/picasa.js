@@ -231,7 +231,7 @@ Picasa.prototype = {
 			'<div id="PV_Loading"></div>'+
 			'<div id="PV_Error" >error</div>'+
 			'<div id="PV_Number"></div>'+
-			'<a href="#" id="PV_Close" ><span>×</span></a>'+
+			'<a href="javascript: void(0);" id="PV_Close" ><span>×</span></a>'+
 			'<img id="PV_Picture" src="" />'+
 			'<img id="PV_Picture_Temp" src="" />'+
 			'<div id="PV_PerHint"></div>'+
@@ -249,7 +249,7 @@ Picasa.prototype = {
 			'		</div>'+
 			'		<a href="javascript:void(0);" id="PV_rotate_Left" class="tool-btn rotate"><i class=" icon-rotate-left"></i></a>'+
 			'		<a href="javascript:void(0);" id="PV_rotate_Right" class="tool-btn rotate"><i class="icon-rotate-right"></i></a>'+
-			'		<a href="javascript:void(0);" id="PV_Btn_Full" class="tool-btn"><i class="icon-fullscreen"></i></a>'+
+			'		<a href="javascript:void(0);" id="PV_Btn_Full" class="tool-btn"><i class="icon-screen-full"></i></a>'+
 
 			'		<a href="javascript:void(0);" id="PV_Btn_Remove" title="Remove(key delete)" class="tool-btn ml-20"><i class="icon-trash"></i></a>'+
 			'		<a href="javascript:void(0);" id="PV_Btn_Open" class="tool-btn"><i class="icon-external-link"></i></a>'+
@@ -417,9 +417,7 @@ Picasa.prototype = {
 
 		//TODO 点击缩略图问题
 		$('#PV_Btn_Full').die("click").bind('click',function(e){
-			try{
-				core.fullScreen();
-			}catch(e){}
+			try{$.fullScreen();}catch(e){}
 		});
 		$('#PV_rotate_Left').die("click").bind('click',function(e){
 			try{
@@ -439,9 +437,8 @@ Picasa.prototype = {
 		});
 		$('#PV_Btn_Open').die("click").bind('click',function(e){
 			try{
-				//var imageLink = $('#PV_Picture').attr('src');
-				var imageLink = myPicasa.arrItems[myPicasa.currentNo][4];
-				window.open(imageLink);
+				var item = myPicasa.arrItems[myPicasa.currentNo];
+				window.open(item[0][2]);
 			}catch(e){}
 		});
 

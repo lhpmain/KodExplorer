@@ -18,12 +18,12 @@ class yzOffice{
 		$this->filePath = $filePath;
 		if($filePath === -1) return;
 		if(!$filePath || !file_exists($filePath)){
-			show_json('path '.LNG('error'),false);
+			show_json('path '.LNG('explorer.error'),false);
 		}
 
 		$config = $plugin->getConfig();
 		$mode = $config['preview'];
-		$this->cachePath = TEMP_PATH.$this->cachePath.hash_path($this->filePath).$mode.'/';
+		$this->cachePath = TEMP_PATH.'plugin/'.$this->cachePath.hash_path($this->filePath).$mode.'/';
 		$this->taskFile  = $this->cachePath.'info.json';
 		mk_dir($this->cachePath);
 		if(file_exists($this->taskFile)){
@@ -76,9 +76,9 @@ class yzOffice{
 				}
 				$this->saveData();
 			}else{
-				$error = LNG('error');
+				$error = LNG('explorer.error');
 				if(is_array($result) && $result['code'] == 100){
-					$error = LNG('uploadError');
+					$error = LNG('explorer.upload.error');
 				}else if(is_array($result) && is_string($result['data']) ){
 					$error = $result['data'];
 				}
@@ -142,7 +142,7 @@ class yzOffice{
 		$ext = unzip_filter_ext(get_path_ext($file));
 		$cacheFile = $this->cachePath.md5($file.'file').'.'.$ext;
 		if(file_exists($cacheFile)){
-			file_put_out($cacheFile,false);
+			IO::fileOut($cacheFile,false);
 			return;
 		}
 		$result = url_request($file,'GET');
@@ -153,7 +153,7 @@ class yzOffice{
 				$result['data'] = preg_replace($from,'sr="',$result['data']);
 			}
 			file_put_contents($cacheFile, $result['data']);
-			file_put_out($cacheFile,false);
+			IO::fileOut($cacheFile,false);
 		}
 	}
 }

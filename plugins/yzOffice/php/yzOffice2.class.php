@@ -8,36 +8,51 @@
 //官网用户demo
 //http://www.yozodcs.com/examples.html
 class yzOffice2{
-	public $cachePath = 'yzOffice/';
 	public $plugin;
 	public $filePath;
 	public $task;
 	public $taskFile;
 	public $api;
+
+	public $cachePath;	// 缓存文件目录
+	public $cacheTask;	// 任务信息缓存名称
 	public function __construct($plugin,$filePath,$oldVersion=true){
 		$this->plugin = $plugin;
 		$this->filePath = $filePath;
-		//新版本，加入了文件上传2M的限制; http://dcs.yozosoft.com/examples.html
+
+		if($oldVersion){
+			//旧版本;http://dcs.yozosoft.com/examples.html
+			$this->api = array(
+				'upload'	=> 'http://dcs.yozosoft.com/testUpload',
+				'convert'	=> 'http://dcs.yozosoft.com/convert',
+			);
+		}else{
+			//新版本，加入了文件上传2M的限制; http://dcs.yozosoft.com/examples.html
+			$this->api = array(
+				'upload'	=> "http://www.yozodcs.com/testUpload",
+				'convert'	=> "http://www.yozodcs.com/convert",
+			);
+		}
 		$this->api = array(
-			'upload'	=> "http://www.yozodcs.com/testUpload",
-			'convert'	=> "http://www.yozodcs.com/convert",
+			'upload'	=> 'http://www.yozodcs.com/fcscloud/file/upload',
+			'convert'	=> 'http://www.yozodcs.com/fcscloud/composite/convert',
 		);
 
-		if($filePath === -1) return;
-		if(!$filePath || !file_exists($filePath)){
-			show_json('path '.LNG('not_exist'),false);
-		}
+		// $config = $plugin->getConfig();
+		// $mode = $config['preview'];
+		$this->cachePath = $this->plugin->cachePath;
+		$this->cacheTask = md5($this->cachePath . $this->filePath);
 
-		$config = $plugin->getConfig();
-		$mode = $config['preview'];
-		$this->cachePath = TEMP_PATH.$this->cachePath.hash_path($this->filePath).$mode.'/';
-		$this->taskFile  = $this->cachePath.'info.json';
-		mk_dir($this->cachePath);
-		if(file_exists($this->taskFile)){
-			$task_has = json_decode(file_get_contents($this->taskFile),true);
-			$this->task = is_array($task_has)?$task_has:false;
+		// 任务信息，如有缓存直接读取；否则读任务文件内容，存入缓存
+		$this->taskFile = $this->cachePath.'info.json';
+		if($this->task = Cache::get($this->cacheTask)) return;
+		if($info = IO::infoFull($this->taskFile)){
+			$this->taskFile = $info['path'];
+			$taskHas = json_decode(IO::getContent($this->taskFile),true);
+			$this->task = $taskHas;
+			return Cache::set($this->cacheTask, $taskHas);
 		}
-		//show_json($this->upload(),false);
+		return $this->task = false;
 	}
 	public function runTask(){
 		$task = array(
@@ -80,9 +95,9 @@ class yzOffice2{
 				}
 				$this->saveData();
 			}else{
-				$error = LNG('error');
+				$error = LNG('explorer.error');
 				if(is_array($result) && $result['code'] == 100){
-					$error = LNG('uploadError');
+					$error = LNG('explorer.upload.error');
 				}else if(is_array($result) && is_string($result['data']) ){
 					$error = $result['data'];
 				}
@@ -103,13 +118,22 @@ class yzOffice2{
 		show_json($task);
 	}
 	public function saveData(){
-		$data = json_encode_force($this->task);
-		file_put_contents($this->taskFile,$data);
+		Cache::set($this->cacheTask, $this->task);
+		if($this->taskSuccess($this->task)){
+			$data = json_encode_force($this->task);
+			return $this->plugin->pluginCacheFileSet($this->taskFile, $data);
+		}
+	}
+	// 是否转换成功
+	public function taskSuccess($taskHas){
+		if(!is_array($taskHas)) return false;
+		$lastStep = end($taskHas['steps']);
+		return $lastStep['status'] == 2 ? $taskHas : false;
 	}
 
 	private function convertMode(){
 		$config = $this->plugin->getConfig();
-		$ext  = get_path_ext($this->filePath);
+		$ext = get_path_ext($this->plugin->fileInfo['name']);
 		$mode = $config['preview'];
 		if(in_array($ext,array("xls","xlsb","xlsx","xlt","xlsm","csv",'ppt','pptx'))){
 			$mode = '1';//excle不支持高清模式，自动切换
@@ -119,30 +143,31 @@ class yzOffice2{
 
 	//非高清预览【返回上传后直接转换过的文件】
 	public function upload(){
+		ignore_timeout();
+		// 上传文件至cad服务器，先下载至本地，地址入缓存（进度和重启需要）
+		$path = $this->plugin->pluginLocalFile($this->filePath);
+		Cache::set($this->cacheTask . '_localFile', $path);
 		$post = array(
-			"file"			=> "@".$this->filePath,
-			"convertType"	=> $this->convertMode()
+			"file"			=> "@".$path,
+			"convertType"	=> $this->convertMode(),
 		);
-		curl_progress_bind($this->filePath,$this->task['taskUuid']);//上传进度监听id
+		curl_progress_bind($path,$this->task['taskUuid']);//上传进度监听id
 		$result = url_request($this->api['upload'],'POST',$post,false,false,true,3600);
-		if(is_array($result) && $result['data']){
-			return $result;
-		}
-		return false;
+		del_file($path);
+		return is_array($result) && $result['data'] ? $result : false;
 	}
 	public function convert($tempFile=false){
 		$headers = array("Content-Type: application/x-www-form-urlencoded; charset=UTF-8");
-		$tempFile = $tempFile?$tempFile:$this->task['steps'][0]['result']['data'];
-		if(!$tempFile){
-			show_json("操作失败: ".$this->task['steps'][0]['result']['message'],false,$this->task);
-		}
+		// $tempFile = $tempFile?$tempFile:$this->task['steps'][0]['result']['data'];
+		$tempFile = $tempFile?$tempFile:$this->task['steps'][0]['result']['data']['data'];
 		$post = array(
-			"inputDir"		=> $tempFile,
-			"convertType"	=> $this->convertMode(),
+			// "inputDir"		=> $tempFile,
+			"srcRelativePath"	=> $tempFile,
+			"convertType"		=> $this->convertMode(),
 			"isAsync"		=> 0,
 		);
-		$post   = http_build_query($post);//post默认用array发送;content-type为x-www-form-urlencoded时用key=1&key=2的形式
-		$result = url_request($this->api['convert'],'POST',$post,$headers,false,true,5);
+		$post = http_build_query($post);//post默认用array发送;content-type为x-www-form-urlencoded时用key=1&key=2的形式
+		$result = url_request($this->api['convert'],'POST',$post,$headers,false,true,3600);
 		if(is_array($result) && is_array($result['data'])){
 			return $result;
 		}
@@ -150,23 +175,34 @@ class yzOffice2{
 	}
 
 	public function clearChche(){
-		del_dir($this->cachePath);
+		$localFile = Cache::get($this->cacheTask . '_localFile');
+		del_dir(get_path_father($localFile));
+		IO::remove($this->cachePath, false);
+		Cache::remove($this->cacheTask);
+		Cache::remove($this->cacheTask . '_localFile');
+		// show_json('success');
 	}
+
 	public function uploadProcess(){
-		return curl_progress_get($this->filePath,$this->task['taskUuid']);
+		$localFile = Cache::get($this->cacheTask . '_localFile');
+		return curl_progress_get($localFile,$this->task['taskUuid']);
 	}
 	public function getFile($file){
 		ignore_timeout();
+		$name = get_path_this(get_path_father($file));
+		$file = str_replace($name, urlencode($name), $file);	// 中文名称转义
+		//检查是否缓存
 		$ext = unzip_filter_ext(get_path_ext($file));
-		$cacheFile = $this->cachePath.md5($file.'file').'.'.$ext;
-		if(file_exists($cacheFile)){
-			file_put_out($cacheFile,false);
-			return;
+		$fileName = md5($file.'file') . '.' . $ext;
+		// $cacheFile = $this->cachePath . hash_path($file);
+		$cacheFile = $this->cachePath . $fileName;
+		if($info = IO::infoFull($cacheFile)){
+			return IO::fileOut($info['path']);
 		}
 		$result = url_request($file,'GET');
 		if($result['code'] == 200){
-			file_put_contents($cacheFile, $result['data']);
-			file_put_out($cacheFile,false);
+			$cacheFile = $this->plugin->pluginCacheFileSet($cacheFile, $result['data']);
+			IO::fileOut($cacheFile);
 		}
 	}
 }

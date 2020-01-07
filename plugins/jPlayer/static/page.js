@@ -3,7 +3,7 @@ define(function(require, exports) {
 	var musicTemplate = '';
 	var MUSIC = 'music-player';
 	var MOVIE = 'movie-player';
-	var appStatic,appStaticDefault;
+	var appStatic;
 
 	var create = function(playerType){
 		var ico = playerType == MUSIC?'mp3':'mp4';
@@ -19,7 +19,6 @@ define(function(require, exports) {
 			simple:true,
 			ico:core.icon(ico),
 			title:'player',
-			// top:'25%',
 			disableTab:true,
 			width:size.width,
 			height:size.height,
@@ -29,7 +28,8 @@ define(function(require, exports) {
 			fixed:true,
 			close:function(){
 				var player = getPlayer(playerType);
-				player.jPlayer("destroy");//.jPlayer("pause");
+				player && player.jPlayer("destroy");//.jPlayer("pause");
+				return false
 			}
 		});
 		dialog.DOM.wrap.addClass('my-jPlayer');
@@ -39,19 +39,16 @@ define(function(require, exports) {
 	var getPlayerType = function(ext){
 		if (ext =='music' ) return MUSIC;
 		if (ext == undefined) ext = 'mp3';
-		if (inArray(['mp3','wav','aac',	'm4a','oga','ogg','webma','m3u8a','m3ua','flac'],ext)) {
+		if (_.includes(['mp3','wav','aac',	'm4a','oga','ogg','webma','m3u8a','m3ua','flac'],ext)) {
 			return MUSIC;
 		}else {
 			return MOVIE;
 		}
 	};
 	var getPlayer = function(playerType){
-		var selector = '.'+playerType+'-dialog';
-		var dialog = $(selector);
-		if(dialog.length == 0){
-			return false;
-		}
-		return dialog.find(".jPlayer-container");
+		var $content = $('.'+playerType+'-dialog .jPlayer-container');
+		if($content.length == 0 ) return false;
+		return $content;
 	}
 
 	/*
@@ -117,7 +114,8 @@ define(function(require, exports) {
 		}
 
 		//delay start play;
-		player.jPlayer("setMedia",media).jPlayer("play");;
+		player.jPlayer("setMedia",media);
+		player.jPlayer("play");
 		jPlayerBindControl($playerBox);
 		setTimeout(function(){
 			var name = $playerBox.parents('.dialog-simple').find('.aui-title-bar').attr('id');
@@ -129,10 +127,11 @@ define(function(require, exports) {
 	}
 
 	var play = function(list){
+		playerLoad();
 		var ext = list[0]['ext'];
 		var playerType = getPlayerType(ext);
 		var player = getPlayer(playerType);
-		var media = getMedia(list[0]);
+		var media  = getMedia(list[0]);
 		if(!player){
 			player = create(playerType);
 			if(playerType == MUSIC){
@@ -226,7 +225,7 @@ define(function(require, exports) {
 			var url = media.url+'&download=1';
 			kodApp.download(url);
 		}
-		var init = function(player){
+		var init = function(){
 			playCurrent = 0;
 			playList = [];
 			loopType = 'circle';
@@ -284,7 +283,7 @@ define(function(require, exports) {
 					'<li class="item">\
 						<span class="name">'+val.title+'</span>\
 						<div class="action-right">\
-							<span class="download"><i class="icon-download-alt"></i></span>\
+							<span class="download"><i class="icon-download"></i></span>\
 							<span class="remove"><i class="icon-remove"></i></span>\
 						</div>\
 					</li>';
@@ -326,11 +325,11 @@ define(function(require, exports) {
 	
 	var readyPlay = function(list){
 		if( !$.isArray(list) || list.length == 0){
-			Tips.tips(LNG.error,false);
+			Tips.tips(LNG['explorer.error'],false);
 		}
 		var playerType = getPlayerType(list[0]['ext']);
 		if(playerType == MOVIE){
-			require.async([
+			requireAsync([
 				appStatic+'jPlayer/kod.flat/template.js',
 				appStatic+'jPlayer/jquery.jplayer.min.js',
 				appStatic+'jPlayer/kod.flat/control.js',
@@ -340,7 +339,7 @@ define(function(require, exports) {
 				play(list);
 			});
 		}else{
-			require.async([
+			requireAsync([
 				appStatic+'jPlayer/kod.flat/template.js',
 				appStatic+'jPlayer/jquery.jplayer.min.js',
 				appStatic+'jPlayer/kod.flat/control.js',
@@ -359,7 +358,8 @@ define(function(require, exports) {
 			$('<div style="width:0px;height:0px;" class="'+playerKey+'"></div>').appendTo('body');
 		}
 		var $dom = $('.'+playerKey);
-		require.async(appStatic+'jPlayer/jquery.jplayer.min.js',function(a){
+		requireAsync(appStatic+'jPlayer/jquery.jplayer.min.js',function(a){
+			playerLoad();
 			var config = {
 				solution:'html',//'html,flash'
 				swfPath: appStatic+'jPlayer/jquery.jplayer.swf',
@@ -372,6 +372,32 @@ define(function(require, exports) {
 			$dom.jPlayer(config);
 		});
 	}
+	
+	var isPlayerLoad = false;
+	var playerLoad = function(){
+		if(isPlayerLoad) return;
+		isPlayerLoad = true;
+		
+		// 解决首次打开时报错问题
+		if(window.HTMLMediaElement){
+			var oldPlay = HTMLMediaElement.prototype.play;
+			HTMLMediaElement.prototype.play = function(){
+				// this.load();
+				var playPromise = oldPlay.apply(this,arguments);
+				if (playPromise !== undefined) {
+					playPromise.then(function(){}).catch(function(){})
+				}
+			}
+		}
+		
+		// 解决切换音乐时,blank报错问题;
+		$.jPlayer.prototype._html_clearMedia = function() {
+			if ( this.htmlElement.media ) {
+				this.htmlElement.media.removeAttribute( 'src' );
+				this.htmlElement.media.load();
+			}
+		};
+	};
 
 	return {
 		init:function(staticPath,staticDefault){

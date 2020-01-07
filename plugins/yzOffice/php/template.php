@@ -2,8 +2,7 @@
 <head>
 	<meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=no" />
 	<meta charset="utf-8">
-	<link rel="stylesheet" href="<?php echo STATIC_PATH;?>style/common.css" type="text/css">
-	<link rel="stylesheet" href="./static/style/font-awesome/css/font-awesome.css">
+	<link rel="stylesheet" href="<?php echo STATIC_PATH;?>style/lib/main.css" type="text/css">
 	<title><?php echo $fileName;?></title>
 	<style>
 		body {margin: 0;font-family: "Helvetica Neue Light", "Segoe UI Semilight", sans-serif;}
@@ -68,14 +67,12 @@
 	</div>
 	<div id="MyViewerDiv"></div>
 </body>
-	<script src="<?php echo STATIC_PATH;?>js/lib/jquery-1.8.0.min.js"></script>
-	<script src="<?php echo STATIC_PATH;?>js/lib/jquery-lib.js"></script>
-	<script src="<?php echo STATIC_PATH;?>js/lib/util.js"></script>
-
+	<script src="<?php echo STATIC_PATH;?>app/dist/vendor.js"></script>
+	<script src="<?php echo STATIC_PATH;?>app/dist/lib.js"></script>
 	<script type="text/javascript">
 		var LNG = {
-			"error":"<?php echo LNG('error');?>",
-			"success":"<?php echo LNG('success');?>",
+			"error":"<?php echo LNG('explorer.error');?>",
+			"success":"<?php echo LNG('explorer.success');?>",
 			"yzOffice.Main.transfer":"<?php echo LNG('yzOffice.Main.transfer');?>",
 			"yzOffice.Main.converting":"<?php echo LNG('yzOffice.Main.converting');?>",
 			"yzOffice.Main.uploadError":"<?php echo LNG('yzOffice.Main.uploadError');?>",
@@ -109,7 +106,7 @@
 				if(!data.code){
 					var error = data.data;
 					if(!_.isString(error)){
-						error = LNG.error;
+						error = LNG['explorer.error'];
 					}
 					clearInterval(repeatTimer);
 					$('.progress-text').addClass('alert-danger').html(error);
@@ -121,7 +118,7 @@
 				if(data.data.success == 1){
 					clearInterval(repeatTimer);
 					var item = data.data.steps[data.data.steps.length-1];
-					$('.progress-text').html(LNG.success+LNG['yzOffice.Main.convert']);
+					$('.progress-text').html(LNG['success']+LNG['yzOffice.Main.convert']);
 					loadSuccess(data);
 				}else{
 					var step = data.data.steps[data.data.currentStep];

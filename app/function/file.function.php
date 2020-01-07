@@ -81,8 +81,8 @@ function path_filter($path){
 //http://stackoverflow.com/questions/5501451/php-x86-how-to-get-filesize-of-2-gb-file-without-external-program
 function get_filesize($path){
 	$result = false;
-	$fp = fopen($path,"r");
-	if(! $fp = fopen($path,"r")) return $result;
+	$fp = @fopen($path,"r");
+	if(! $fp = @fopen($path,"r")) return $result;
 	if(PHP_INT_SIZE >= 8 ){ //64bit
 		$result = (float)(abs(sprintf("%u",@filesize($path))));
 	}else{
@@ -264,16 +264,15 @@ function get_path_ext($path){
 
 //自动获取不重复文件(夹)名
 //如果传入$file_add 则检测存在则自定重命名  a.txt 为a{$file_add}.txt
-//$same_file_type  rename,replace,skip,folder_rename
 function get_filename_auto($path,$file_add = "",$same_file_type='replace'){
-	if (is_dir($path) && $same_file_type!='folder_rename') {//文件夹则忽略
+	if (is_dir($path) && $same_file_type!=REPEAT_RENAME_FOLDER) {//文件夹则忽略
 		return $path;
 	}
 	//重名处理
 	if (file_exists($path)) {
-		if ($same_file_type=='replace') {
+		if ($same_file_type== REPEAT_REPLACE) {
 			return $path;
-		}else if($same_file_type=='skip'){
+		}else if($same_file_type==REPEAT_SKIP){
 			return false;
 		}
 	}
@@ -524,33 +523,6 @@ function copy_dir($source, $dest){
 	return $result;
 }
 
-/**
- * 移动文件&文件夹；（同名文件夹则特殊处理）
- * 问题：win下，挂载磁盘移动到系统盘时rmdir导致遍历不完全；
- */
-function move_path2($source,$dest,$repeat_add='',$repeat_type='replace'){
-	if (!$dest) return false;
-	if (is_dir($source) && $source == substr($dest,0,strlen($source))) return false;//防止父文件夹拷贝到子文件夹，无限递归
-	@set_time_limit(0);
-	if (is_file($source)) {
-		return move_file($source,$dest,$repeat_add,$repeat_type);
-	}else if(is_dir($source)) {
-		if ($dest[strlen($dest)-1] == '/') {
-			$dest = $dest . basename($source);
-		}
-		if (!file_exists($dest)) {
-			@mkdir($dest,0777);
-		}
-		if (!$dh = opendir($source)) return false;
-		while (($file = readdir($dh)) !== false) {
-			if ($file =='.' || $file =='..') continue;
-			move_path($source."/".$file, $dest."/".$file,$repeat_add,$repeat_type);
-		}
-		closedir($dh);
-		return @rmdir($source);
-	}
-}
-
 function move_file($source,$dest,$repeat_add,$repeat_type){
 	if ($dest[strlen($dest)-1] == '/') {
 		$dest = $dest . "/" . basename($source);
@@ -636,6 +608,7 @@ function recursion_dir($path,&$dir,&$file,$deepest=-1,$deep=0){
 	$path = rtrim($path,'/').'/';
 	if (!is_array($file)) $file=array();
 	if (!is_array($dir)) $dir=array();
+	if (!is_dir($path)) return false;
 	if (!$dh = opendir($path)) return false;
 	while(($val=readdir($dh)) !== false){
 		if ($val=='.' || $val=='..') continue;
@@ -657,14 +630,83 @@ function dir_list($path){
 	return array_merge($dirs,$files);
 }
 
+/**
+ * 借用临时文件方式对读写文件进行锁定标记
+ * 
+ * fopen mode: http://www.w3school.com.cn/php/func_filesystem_fopen.asp
+ * flock mode: http://www.w3school.com.cn/php/func_filesystem_flock.asp
+ */
+function file_lock($file,$open=true,$type='read',$timeout=5){
+	clearstatcache();
+	$lockFile  = $file.'.'.$type.'.lock';
+	$lockRead  = $file.'.read.lock';
+	$lockWrite = $file.'.write.lock';
+	if(!$open){
+		@unlink($lockFile);
+		clearstatcache();
+		return;
+	}
+
+	$startTime = microtime(true);
+	do{
+		clearstatcache();
+		$canLock = true;
+		if( $type=='read' ){
+			if( file_exists($lockWrite) ){
+				$canLock = false;
+			}
+		}else if( $type=='write' ){
+			if( file_exists($lockWrite) || file_exists($lockRead) ){
+				$canLock = false;
+			}
+		}
+		if(!$canLock){
+			usleep(mt_rand(10, 50) * 1000);//10~50ms;
+		}
+	} while((!$canLock) && ((microtime(true) - $startTime) < $timeout ));
+	$result = false;
+	if($canLock){
+		$result = file_put_contents($lockFile,time(),LOCK_EX);
+		clearstatcache();
+		$result = $result && file_exists($lockFile);
+		//if(!$result){write_log($_GET['action'].';file not exists','test2');}
+	}
+	return $result;
+}
+
 // 安全读取文件，避免并发下读取数据为空
-function file_read_safe($file,$timeout = 3){
+function file_read_safe1($file,$timeout = 5){
+	if(file_lock($file,true,'read',$timeout)){
+		$fp = @fopen($file, 'r');
+		if(!$fp || !flock($fp, LOCK_EX)) return false;
+		$result = fread($fp, filesize($file));
+		flock($fp,LOCK_UN);fclose($fp);
+
+		file_lock($file,false,'read');
+		return $result;
+	}
+	return false;
+}
+// 安全读取文件，避免并发下读取数据为空
+function file_wirte_safe1($file,$buffer,$timeout=5){
+	if(file_lock($file,true,'write',$timeout)){
+		$result = @file_put_contents($file,$buffer,LOCK_EX);
+		file_lock($file,false,'write');
+		return $result;
+	}
+	return false;
+}
+
+
+// 安全读取文件，避免并发下读取数据为空
+function file_read_safe($file,$timeout = 5){
+	//return file_read_safe1($file,$timeout);
 	if(!$file || !file_exists($file)) return false;
 	$fp = @fopen($file, 'r');
 	if(!$fp) return false;
 	$startTime = microtime(true);
 	do{
-		$locked = flock($fp, LOCK_SH);//LOCK_EX|LOCK_NB 
+		$locked = flock($fp, LOCK_EX|LOCK_NB);//LOCK_EX|LOCK_NB 
 		if(!$locked){
 			usleep(mt_rand(1, 50) * 1000);//1~50ms;
 		}
@@ -684,7 +726,8 @@ function file_read_safe($file,$timeout = 3){
 }
 
 // 安全读取文件，避免并发下读取数据为空
-function file_wirte_safe($file,$buffer,$timeout=3){
+function file_wirte_safe($file,$buffer,$timeout=5){
+	//return file_wirte_safe1($file,$buffer,$timeout);
 	clearstatcache();
 	if(strlen($file) == 0 || !$file || !file_exists($file)) return false;
 	$fp = fopen($file,'r+');
@@ -804,7 +847,7 @@ function file_search($path,$search,$is_case){
 	}
 
 	$pose = 0; 
-	$file_size = strlen($content);
+	$fileSize = strlen($content);
 	$arr_search = array(); // 匹配结果所在位置
 	while ( $pose !== false) {
 		$pose = $strpos($content,$search, $pose);
@@ -827,7 +870,7 @@ function file_search($path,$search,$is_case){
 			break;
 		}
 	}
-	$arr_line[] = $file_size;//文件只有一行而且没有换行，则构造虚拟换行
+	$arr_line[] = $fileSize;//文件只有一行而且没有换行，则构造虚拟换行
 	$result = array();//  [2,10,22,45,60]  [20,30,40,50,55]
 	$len_search = count($arr_search);
 	$len_line 	= count($arr_line);
@@ -847,7 +890,7 @@ function file_search($path,$search,$is_case){
 				while (!in_array($content[$from],$token) && $from >= 0) {
 					$from -- ;
 				}
-				while (!in_array($content[$to],$token) && $to <= $file_size) {
+				while (!in_array($content[$to],$token) && $to <= $fileSize) {
 					$to ++ ;
 				}
 			}
@@ -874,7 +917,7 @@ function file_search($path,$search,$is_case){
  * @param  $path 文件(夹)目录
  * @return :string
  */
-function chmod_path($path,$mod){
+function chmod_path($path,$mod=0777){
 	if (!isset($mod)) $mod = 0777;
 	if (!file_exists($path)) return false;
 	if (is_file($path)) return @chmod($path,$mod);
@@ -964,131 +1007,6 @@ function is_text_file($ext){
 }
 
 /**
- * 输出、文件下载，断点续传支持
- * 默认以附件方式下载；$download为false时则为输出文件
- * 视频播放拖拽：流媒体服务器
- * 文件缓存：http://blog.csdn.net/eroswang/article/details/8302191
- */
-function file_put_out($file,$download=-1,$downFilename=false){
-	$error = false;
-	if (!file_exists($file)){
-		$error = 'file not exists';
-	}else if (!path_readable($file)){
-		$error = 'file not readable';
-	}else if (!$fp = @fopen($file, "rb")){
-		$error = 'file open error!';
-	} 
-	if($error !== false){
-		if($downFilename === false){
-			return;
-		}else{
-			show_json($error,false);
-		}
-	}
-
-	$start= 0;
-	$file_size = get_filesize($file);
-	$end  = $file_size - 1;
-	@ob_end_clean();
-	@set_time_limit(0);
-
-	$time = gmdate('D, d M Y H:i:s',filemtime($file));
-	$filename = get_path_this($file);
-	if($downFilename !== false){
-		$filename = $downFilename;
-	}
-
-	$mime = get_file_mime(get_path_ext($filename));
-	if ($download === -1 && !mime_support($mime)){
-		$download = true;
-	}
-	$headerName = rawurlencode(iconv_app($filename));
-	$headerName = '"'.$headerName."\"; filename*=utf-8''".$headerName;
-	if ($download) {
-		header('Content-Type: application/octet-stream');
-		header('Content-Transfer-Encoding: binary');
-		header('Content-Disposition: attachment;filename='.$headerName);
-	}else{
-		header('Content-Type: '.$mime);
-		header('Content-Disposition: inline;filename='.$headerName);
-		if(strstr($mime,'text/')){
-			//$charset = get_charset(file_get_contents($file));
-			header('Content-Type: '.$mime.'; charset=');//避免自动追加utf8导致gbk网页乱码
-		}
-	}
-	
-	//缓存文件
-	header('Expires: '.gmdate('D, d M Y H:i:s',time()+3600*24*20).' GMT');
-	header('Cache-Pragma: public');
-	header('Pragma: public'); 
-	header('Cache-Control: cache, must-revalidate');
-	if (isset($_SERVER['If-Modified-Since']) && 
-		(strtotime($_SERVER['If-Modified-Since']) == filemtime($file))) {
-		header('304 Not Modified', true, 304);
-		exit;
-	}
-	$etag = '"'.md5($time.$file_size).'"';
-	if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && $_SERVER['HTTP_IF_NONE_MATCH'] == $etag){
-		header("Etag: ".$etag, true, 304);
-		exit;
-	}
-	header('Etag: '.$etag);
-	header('Last-Modified: '.$time.' GMT');
-	header("X-OutFileName: ".$filenameOutput);
-	header("X-Powered-By: kodExplorer.");
-	header("X-FileSize: ".$file_size);
-
-	//调用webserver下载
-	$server = strtolower($_SERVER['SERVER_SOFTWARE']);
-	if($server && $GLOBALS['config']['settings']['httpSendFile']){
-		if(strstr($server,'nginx')){//nginx
-			header("X-Sendfile: ".$file);
-		}else if(strstr($server,'apache')){ //apache
-			header('X-Accel-Redirect: '.$file);
-		}else if(strstr($server,'http')){//light http
-			header( "X-LIGHTTPD-send-file: " . $file);
-		}
-		return;
-	}
-	
-	//远程路径不支持断点续传；打开zip内部文件
-	if(!file_exists($file)){
-		header('HTTP/1.1 200 OK');
-		header('Content-Length: '.($end+1));
-		return;
-	}
-	header("Accept-Ranges: bytes");
-	if (isset($_SERVER['HTTP_RANGE'])){
-		if (preg_match('/bytes=\h*(\d+)-(\d*)[\D.*]?/i', $_SERVER['HTTP_RANGE'], $matches)){
-			$start	= intval($matches[1]);
-			if (!empty($matches[2])){
-				$end = intval($matches[2]);
-			}
-		}
-		header('HTTP/1.1 206 Partial Content');
-	}else{
-		header('HTTP/1.1 200 OK');
-	}
-	if(isset($_GET['start'])){//flash video
-		$start = intval($_GET['start']);
-	}
-	header('Content-Length:' . (($end - $start) + 1));
-	if (isset($_SERVER['HTTP_RANGE']) || isset($_GET['start'])){
-		header("Content-Range: bytes $start-$end/".$file_size);
-	}
-
-	//输出文件
-	$cur = $start;
-	fseek($fp, $start,0);
-	while(!feof($fp) && $cur <= $end){ // && (connection_status() == 0)
-		print fread($fp, min(1024 * 200, ($end - $cur) + 1));
-		$cur += 1024 *200;
-		flush();
-	}
-	fclose($fp);
-}
-
-/**
  * 远程文件下载到服务器
  * 支持fopen的打开都可以；支持本地、url
  */
@@ -1162,22 +1080,6 @@ function get_mode($file){
 	return $Mode.'('.$theMode.')';
 }
 
-/**
- * 获取可以上传的最大值
- * return * byte
- */
-function get_post_max(){
-	$upload = ini_get('upload_max_filesize');
-	$upload = $upload==''?ini_get('upload_max_size'):$upload;
-	$post = ini_get('post_max_size');
-	$upload = intval($upload)*1024*1024*0.8;
-	$post = intval($post)*1024*1024*0.8;
-	$the_max = $upload<$post?$upload:$post;
-	return $the_max==0?1024*1024*0.5:$the_max;//获取不到则500k
-}
-
-
-
 function path_clear($path){
 	$path = str_replace('\\','/',trim($path));
 	$path = preg_replace('/\/+/', '/', $path);
@@ -1191,227 +1093,6 @@ function path_clear_name($path){
 	$path = str_replace('/','.',trim($path));
 	return $path;
 }
-
-// 兼容move_uploaded_file 和 流的方式上传
-function kod_move_uploaded_file($fromPath,$savePath){
-	$tempPath = $savePath.'.parttmp';
-	if($fromPath == "base64"){
-		@file_put_contents($tempPath,base64_decode($_POST['file']));
-	}else if($fromPath == "php://input"){
-		$in  = @fopen($fromPath, "rb");
-		$out = @fopen($tempPath, "wb");
-		if(!$in || !$out) return false;
-		while (!feof($in)) {
-			fwrite($out, fread($in, 1024*200));
-		}
-		fclose($in);
-		fclose($out);
-	}else{
-		if(!move_uploaded_file($fromPath,$tempPath)){
-			show_json('move uploaded file error!',false);
-		}
-	}
-
-	$result = rename($tempPath,$savePath);
-	chmod_path($savePath,DEFAULT_PERRMISSIONS);
-	return $result;
-}
-function check_upload($error){
-	$status = array(
-		'UPLOAD_ERR_OK',        //0 没有错误发生，文件上传成功。
-		'UPLOAD_ERR_INI_SIZE',  //1 上传的文件超过了php.ini 中 upload_max_filesize 选项限制的值。
-		'UPLOAD_ERR_FORM_SIZE', //2 上传文件的大小超过了 HTML 表单中 MAX_FILE_SIZE 选项指定的值。
-		'UPLOAD_ERR_PARTIAL',   //3 文件只有部分被上传。
-		'UPLOAD_ERR_NO_FILE',   //4 没有文件被上传。
-		'UPLOAD_UNKNOW',		//5 未定义
-		'UPLOAD_ERR_NO_TMP_DIR',//6 找不到临时文件夹。php 4.3.10 和 php 5.0.3 引进。
-		'UPLOAD_ERR_CANT_WRITE',//7 文件写入失败。php 5.1.0 引进。
-	);
-	return $error.':'.$status[$error];
-}
-
-//拍照上传
-function updload_ios_check($fileName,$in){
-	if(!is_wap()) return $fileName;
-	$time = strtotime($in['lastModifiedDate']);
-	$time = $time ? $time : time();
-	$beforeName = strtolower($fileName);
-	if($beforeName == "image.jpg" || $beforeName == "image.jpeg"){
-		$fileName =  date('Ymd',$time).'_'.$in['size'].'.jpg';
-	}else if($beforeName == "capturedvideo.mov"){
-		$fileName =  date('Ymd',$time).'_'.$in['size'].'.mov';
-	}
-	return $fileName;
-}
-
-/**
- * 文件上传处理。大文件支持分片上传
- * upload('file','D:/www/');
- *
- * post上传：base64Upload=1;file=base64str;name=filename
- */
-function upload($path,$tempPath,$repeatAction='replace'){
-	ignore_timeout();
-	global $in;
-	$fileInput = 'file';
-	$fileName = "";
-	if (!empty($_FILES)) {
-		$fileName = iconv_system(path_clear_name($_FILES[$fileInput]["name"]));
-		$uploadFile = $_FILES[$fileInput]["tmp_name"];
-		if(!$uploadFile && $_FILES[$fileInput]['error']>0){
-			show_json(check_upload($_FILES[$fileInput]['error']),false);
-		}
-		$fileName = updload_ios_check($fileName,$in);//拍照上传
-	}else if (isset($in["name"])) {
-		$fileName = iconv_system(path_clear_name($in["name"]));
-		$uploadFile = "php://input";
-		if(isset($in['base64Upload'])){
-			$uploadFile = "base64"; 
-		}
-		$fileName = updload_ios_check($fileName,$in);//拍照上传
-	}else if( isset($in["check_md5"]) ) {//断点续传检测
-		$fileName = iconv_system(path_clear_name($in["name"]));
-		$savePath = get_filename_auto($path.$fileName,""); //自动重命名
-		return upload_chunk("--check_md5--",$tempPath,$savePath);
-	}else{
-		show_json('param error',false);
-	}
-
-	//正常上传
-	$savePath = get_filename_auto($path.$fileName,"",$repeatAction); //自动重命名
-	Hook::trigger('uploadFileBefore',$savePath);
-	if($savePath === false){
-		show_json('upload_exist_skip',false);
-	}
-
-	$chunks = isset($in["chunks"]) ? intval($in["chunks"]) : 1;
-	if ($chunks > 1) {//并发上传，不一定有前后顺序
-		return upload_chunk($uploadFile,$tempPath,$savePath);
-	}
-	if(kod_move_uploaded_file($uploadFile,$savePath)){
-		Hook::trigger('uploadFileAfter',$savePath);
-		show_json('upload_success',true,iconv_app(_DIR_OUT($savePath)));
-	}else {
-		show_json('move_error',false);
-	}
-}
-
-
-/**
- * 简易文件hash获取;替代md5_file;
- * md5(文件头6字节+中间6字节+结尾6字节)
- */
-function file_hash_simple($file){
-	$fileSize    = filesize($file);
-	$sliceLength = 6;
-	if($fileSize <= $sliceLength){
-		$sliceString = file_get_contents($file);
-	}else{
-		$fp = fopen($file,'r');
-		$sliceString = fread($fp,$sliceLength);
-		fseek($fp,($fileSize-$sliceLength)/2);
-		$sliceString .= fread($fp,$sliceLength);
-		fseek($fp,$fileSize-$sliceLength);
-		$sliceString .= fread($fp,$sliceLength);
-		fclose($fp);
-	}
-	$hash = $fileSize;
-	for ($i=0; $i < strlen($sliceString); $i++) { 
-		$hash = $hash.",".ord($sliceString[$i]);
-	}
-	return md5($hash);
-}
-
-function upload_chunk($uploadFile,$tempPath,$savePath){
-	global $in;
-	$chunk = isset($in["chunk"]) ? intval($in["chunk"]) : 0;
-	$chunks = isset($in["chunks"]) ? intval($in["chunks"]) : 1;
-	$check_md5 = isset($in["check_md5"]) ? $in["check_md5"] : false;
-
-	//if(mt_rand(0, 100) > 10) die("server error".$chunk); //模拟失败
-	//文件分块检测是否已上传，已上传则忽略；断点续传
-	if($check_md5 !== false){
-		$chunk_file_pre = $tempPath.md5($savePath).'.part';
-		$chunk_file = $chunk_file_pre.$chunk;
-		if( file_exists($chunk_file) && file_hash_simple($chunk_file) == $check_md5){
-			$arr = array();
-			for($index = 0; $index<$chunks; $index++ ){
-				if(file_exists($chunk_file_pre.$index)){
-					$arr['part_'.$index] = file_hash_simple($chunk_file_pre.$index);
-				}
-			}
-			show_json('success',true,$arr);
-		}else{
-			show_json('not_exists',false);
-		}
-	}
-
-	$tempFilePre = $tempPath.md5($savePath).'.part';
-	if(kod_move_uploaded_file($uploadFile, $tempFilePre.$chunk)){
-		$done = true;
-	
-		//优化分片存在判断；当分片太多时,每个分片都全量判断,会占用服务器资源及影响上传速度;
-		$fromIndex    = 0;
-		$existMaxFile = $tempFilePre.'.max';//记录连续存在文件的最大序号
-		if(file_exists($existMaxFile)){
-			$fromIndex = intval(file_get_contents($fromIndex));
-		}else{
-			file_put_contents($existMaxFile,$fromIndex);
-		}
-		for($index = $fromIndex; $index<$chunks; $index++ ){
-			if (!file_exists($tempFilePre.$index)) {
-				if($index-1 > $fromIndex){
-					file_put_contents($existMaxFile,$index-1);
-				}
-				$done = false;
-				break;
-			}
-		}
-		
-		if (!$done){
-			show_json('upload_success',true);
-		}else{
-			$savePathTemp = $tempFilePre.mtime();
-			if(!$out = fopen($savePathTemp, "wb")){
-				show_json('no_permission_write',false);
-			}
-			if (!flock($out, LOCK_EX)) {
-				show_json('lock dist move error',false);
-			}else{
-				for( $index = 0; $index < $chunks; $index++ ) {
-					$chunk_file = $tempFilePre.$index;
-					if (!$fp_in = @fopen($chunk_file,"rb")){//并发情况下另一个访问时文件已删除
-						flock($out, LOCK_UN);
-						fclose($out);
-						unlink($savePathTemp);
-						show_json('open chunk error! cur='.$chunk.';index='.$index,false);
-					}
-					while (!feof($fp_in)) {
-						fwrite($out, fread($fp_in,1024*200));
-					}
-					fclose($fp_in);
-					unlink($chunk_file);
-				}
-				flock($out, LOCK_UN);
-				fclose($out);
-			}
-		}
-		unlink($existMaxFile);
-		$res = rename($savePathTemp,$savePath);
-		if(!$res){
-			unlink($savePath);
-			$res = rename($savePathTemp,$savePath);
-			if(!$res){
-				show_json('move(rename) dist file error!',false);
-			}
-		}
-		Hook::trigger('uploadFileAfter',$savePath);
-		show_json('upload_success',true,iconv_app(_DIR_OUT($savePath)));
-	}else {
-		show_json('move_error',false);
-	}
-}
-
 
 /**
  * 写日志
@@ -1444,6 +1125,7 @@ function write_log($log, $type = 'default', $level = 'log'){
 
 	if(is_object($log) || is_array($log)){
 		$log = json_encode_force($log);
+		$log = str_replace(array('\\n','\\r','\\t','\\"','\\\'','\/'),array("\n","\r","\t",'"',"'",'/'),$log);
 	}
 	clearstatcache();
 	return error_log("$now_time $log\n", 3, $target);

@@ -381,7 +381,7 @@ table:after
 
 /* ==================add by warlee==================*/
 
-
+#menu p, #logins, #tables {border-bottom: 1px solid rgba(255, 255, 255, 0.04);}
 #lang {
     top: 0;
     left: 170px;

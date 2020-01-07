@@ -7,12 +7,12 @@ class simpleClockPlugin extends PluginBase{
 	function __construct(){
 		parent::__construct();
 	}
-	public function regiest(){
-		$this->hookRegiest(array(
+	public function regist(){
+		$this->hookRegist(array(
 			'user.commonJs.insert' => 'simpleClockPlugin.echoJs'
 		));
 	}
-	public function echoJs($st,$act){
+	public function echoJs(){
 		$this->echoFile('static/main.js');
 	}
 	public function index(){

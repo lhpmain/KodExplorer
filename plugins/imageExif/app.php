@@ -12,22 +12,24 @@ class imageExifPlugin extends PluginBase{
 			);
 		}
 	}
-	public function regiest(){
-		$this->hookRegiest(array(
-			'user.commonJs.insert'  => 'imageExifPlugin.echoJs',
-			'share.image'			=> 'imageExifPlugin.imageCheck',
-			'explorer.image'		=> 'imageExifPlugin.imageCheck',
+	public function regist(){
+		$this->hookRegist(array(
+			'user.commonJs.insert'	=> 'imageExifPlugin.echoJs',
+			// 'explorer.share.image'	=> 'imageExifPlugin.imageCheck',
+			// 'explorer.index.image'	=> 'imageExifPlugin.imageCheck',
 		));
 	}
-	public function echoJs($st,$act){
+	public function echoJs(){
 		if( !function_exists('exif_read_data')){
 			return;
 		}
 		//$this->echoFile('static/main.js');
 	}
 	public function getExif(){
-		$path = _DIR($this->in['path']);
-		$exif = @exif_read_data($path);
+		$path = $this->filePath($this->in['path']);
+		$localFile = $this->pluginLocalFile($path);
+		$exif = @exif_read_data($localFile);
+		del_file($localFile);
 		show_json($exif,!!$exif);
 	}
 
@@ -39,12 +41,20 @@ class imageExifPlugin extends PluginBase{
 		if( !function_exists('exif_read_data')){
 			return;
 		}
-		$path = _DIR($this->in['path']);
-		$exif = @exif_read_data($path);
-		if(!file_exists($path) || !$exif || !isset($exif['Orientation'])) return;
-		if( $exif['Orientation']< 3) return;
+		$path = $this->filePath($this->in['path']);
+		$localFile = $this->pluginLocalFile($path);
 
-		$img = ImageThumb::image($path);
+		$exif = @exif_read_data($localFile);
+		if(!file_exists($localFile) || 
+			!$exif || 
+			!isset($exif['Orientation']) || 
+			$exif['Orientation'] < 3
+		){
+			del_file($localFile);
+			return;
+		}
+
+		$img = ImageThumb::image($localFile);
 		if(!$img) return;
 		$ort = $exif['Orientation'];
 		if($ort == 5 || $ort == 6){
@@ -59,10 +69,12 @@ class imageExifPlugin extends PluginBase{
 		if($ort == 4 || $ort == 5 || $ort == 7){
 			imageflip($img,IMG_FLIP_HORIZONTAL);
 		}
-		$ext = get_path_ext($path);
+		$ext = get_path_ext($this->fileInfo['name']);
 		$imagefun = 'image'.($ext=='jpg'?'jpeg':$ext);
-		$res = $imagefun($img, $path);
+		$res = $imagefun($img, $localFile);
 		imagedestroy($img);
-		//show_json($exif,$res);
+
+		$this->pluginCacheFileSet($path, file_get_contents($localFile));
+		del_file($localFile);
 	}
 }

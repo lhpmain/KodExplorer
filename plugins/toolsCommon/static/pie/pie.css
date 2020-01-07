@@ -12,7 +12,7 @@
 	.desktop,div.background,
 	.task-tab .tabs .tab,
 	.task-tab .tabs .tab.hover,.task-tab .tabs .tab.this{
-		behavior: url("./?pluginApp/to/toolsCommon/pie");
+		behavior: url("./?plugin/toolsCommon/pie");
 	}
 }
     

@@ -4,21 +4,17 @@ class webodfPlugin extends PluginBase{
 	function __construct(){
 		parent::__construct();
 	}
-	public function regiest(){
-		$this->hookRegiest(array(
+	public function regist(){
+		$this->hookRegist(array(
 			'user.commonJs.insert' => 'webodfPlugin.echoJs',
 		));
 	}
-	public function echoJs($st=false,$act=false){
-		if($this->isFileExtence($st,$act)){
-			$this->echoFile('static/main.js');
-		}
+	public function echoJs(){
+		$this->echoFile('static/main.js');
 	}
 	public function index(){
-		$path = $this->filePath($this->in['path']);
-		$fileUrl  = _make_file_proxy($path);
-		$fileName = get_path_this(rawurldecode($this->in['path']));
-		$fileName.= ' - '.LNG('kod_name').LNG('kod_power_by');
+		$fileUrl  = $this->filePathLink($this->in['path']);
+		$fileName = $this->in['name'] . ' - '.LNG('common.copyright.name').LNG('common.copyright.powerBy');
 		include($this->pluginPath.'/php/template.php');
 	}
 }

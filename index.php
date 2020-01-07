@@ -2,6 +2,6 @@
 	ob_start();
 	include ('config/config.php');
 	$app = new Application();
-	init_config();
+	$app->setDefault('user.index.index');
 	$app->run();
 ?>

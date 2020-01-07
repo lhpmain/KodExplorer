@@ -63,7 +63,7 @@ var jPlayerConfigInit = function($player,config){
 				return;
 			}
 			if(current.jPlayer.error.type != $.jPlayer.error.FLASH){
-				//Tips.tips(LNG.unknow_file_tips+'('+current.jPlayer.error.type+')',false);
+				//Tips.tips(LNG['explorer.unknowFileTips']+'('+current.jPlayer.error.type+')',false);
 			}
 			var $that = $(this);
 			var $jPlayer = $($player).find(".jPlayer-container");

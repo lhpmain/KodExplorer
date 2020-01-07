@@ -1,59 +1,42 @@
 <?php 
 $desktopApps = array(
-	'my_computer' => array(
-		"type"		=> "app",
-		"content"	=> "core.explorer('','".LNG('my_computer')."');",
+	'myComputer' => array(
+		"name"		=> LNG('explorer.toolbar.myComputer'),
+		"type"		=> "path",
+		"value"		=> "",
 		"icon"		=> STATIC_PATH."images/file_icon/icon_others/computer.png",
-		"name"		=> LNG('my_computer'),
-		"menuType"	=> "systemBox menu-default",
-		"ext"		=> 'oexe',
-		"path"		=> "",
-		"resize"	=> 1
+		"menuType"	=> "menu-default-open",
 	),
 	'recycle' => array(
-		"type"		=> "app",
-		"content"	=> "core.explorer('".KOD_USER_RECYCLE."','".LNG('recycle')."');",
-		"icon"		=> STATIC_PATH."images/file_icon/icon_others/recycle.png",
-		"name"		=> LNG('recycle'),
-		"menuType"	=> "systemBox menu-recycle-button",
-		"ext"		=> 'oexe',
-		"path"		=> "",
-		"resize"	=> 1
+		"name"		=> LNG('explorer.toolbar.recycle'),
+		"type"		=> "path",
+		"value"		=> "{userRecycle}",
+		"icon"		=> 'recycle',
+		"menuType"	=> "menu-recycle-tree",
 	),
+
 	'PluginCenter' => array(
-		"type"		=> "app",
-		"content"	=> "core.openWindowBig('./index.php?pluginApp/index','".LNG('PluginCenter')."');",
+		"name"		=> LNG('admin.menu.plugin'),
+		"type"		=> "url",
+		"value"		=> './#admin/plugin',
+		"rootNeed"	=> 1,//管理员应用
 		"icon"		=> STATIC_PATH."images/file_icon/icon_others/plugins.png",
-		"name"		=> LNG('PluginCenter'),
-		"menuType"	=> "systemBox menu-default",
-		"ext"		=> 'oexe',
-		"path"		=> "",
-		"resize"	=> 1
+		"menuType"	=> "menu-default-open",
 	),
 	'setting' => array(
-		"type"		=> "app",
-		"content"	=> "core.setting();",
+		"name"		=> LNG('admin.setting.system'),
+		"type"		=> "url",
+		"rootNeed"	=> 1,
+		"value"		=> './#admin',
 		"icon"		=> STATIC_PATH."images/file_icon/icon_others/setting.png",
-		"name"		=> LNG('setting'),
-		"menuType"	=> "systemBox menu-default",
-		"ext"		=> 'oexe',
-		"path"		=> "/",
-		"resize"	=> 1
+		"menuType"	=> "menu-default-open",
 	),
 	'appStore' => array(
-		"type"		=> "app",
-		"content"	=> "core.appStore();",
+		"name"		=> LNG('explorer.app.app'),
+		"type"		=> "js",
+		"value"		=> "kodApp.root.doAction('appInstall');",
 		"icon"		=> STATIC_PATH."images/file_icon/icon_others/appStore.png",
-		"name"		=> LNG('app_store'),
-		"menuType"	=> "systemBox menu-default",
-		"ext"		=> 'oexe',
-		"path"		=> "",
-		"resize"	=> 1
+		"menuType"	=> "menu-default-open",
 	)
 );
-
-//管理员插件中心
-if(!$GLOBALS['isRoot']){
-	unset($desktopApps['PluginCenter']);
-}
 return $desktopApps;

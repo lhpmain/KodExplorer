@@ -1,15 +1,17 @@
 kodReady.push(function(){
-	kodApp.add({
-		name:"picasa",
-		title:"{{LNG.Plugin.default.picasa}}",
-		ext:"{{config.fileExt}}",
-		sort:"{{config.fileSort}}",
-		icon:"x-item-file x-png",
-		callback:function(imagePath,ext){
-			var appStatic = "{{pluginHost}}static/";
-			require.async(appStatic+'page.js',function(app){
-				app(imagePath,appStatic)
-			});
-		}
+	Events.bind('explorer.kodApp.before',function(appList){
+		appList.push({
+			name:"picasa",
+			title:"{{LNG['admin.plugin.defaultPicasa']}}",
+			ext:"{{config.fileExt}}",
+			sort:"{{config.fileSort}}",
+			icon:"x-item-icon x-png",
+			callback:function(path,ext,name){
+				var appStatic = "{{pluginHost}}static/";
+				requireAsync(appStatic+'page.js',function(app){
+					app(path,ext,name,appStatic)
+				});
+			}
+		});
 	});
 });

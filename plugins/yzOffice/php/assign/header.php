@@ -126,7 +126,7 @@
 		window.addEventListener = window.attachEvent;
 	}
 </script>
-<link href="./static/style/font-awesome/css/font-awesome.css?ver=<?php echo KOD_VERSION;?>" rel="stylesheet">
+<link rel="stylesheet" href="<?php echo STATIC_PATH;?>style/lib/main.css" type="text/css">
 <!--[if IE 7]>
 <link rel="stylesheet" href="./static/style/font-awesome/css/font-awesome-ie7.css">
 <![endif]--> 

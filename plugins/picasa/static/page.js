@@ -1,82 +1,40 @@
 define(function(require, exports) {
-	var imageUrl = function(path,trueImage){
-		if(path.substr(0,4) == 'http'){
-			return path;
+	var getImageArr = function(filePath,name){
+		var $file    = $("[data-path="+hashEncode(filePath)+"]");
+		var $images  = $file.parent().find(".file .picture");
+		var itemsArr = [];
+		var index 	 = 0;
+		var makeItem = function(filePath,name,$dom){
+			itemsArr.push([
+				[
+					core.pathImage(filePath,250),
+					core.pathImage(filePath,1200),
+					core.pathImage(filePath,false)
+				],
+				htmlEncode(name || ''),
+				[0,0],
+				''
+			]);
 		}
-		//gif 预览
-		if(trueImage || core.pathExt(path) == 'gif'){
-			return core.path2url(path);
+		if($images.length > 0){
+			$images.each(function(i){
+				var $curFile = $(this).parents('.file');
+				var curPath  = hashDecode($curFile.attr('data-path'));
+				makeItem(curPath,$curFile.attr('data-name'),$(this).find('img'));
+				if(curPath == filePath){
+					index = i;
+				}
+			});
+		}else{
+			makeItem(filePath,name,false);
 		}
-		
-		var imageThumb = G.appHost+'explorer/image';
-		if(G.sid){
-			imageThumb = G.appHost+'share/image&user='+G.user+'&sid='+G.sid;
-		}
-		imageThumb += '&path='+urlEncode(path)+'&thumbWidth=1200';
-		return imageThumb;
-	}
-	var getImageArr = function(imagePath){
-		var items = [];
-		var index = -1;
-		if(window.Config){
-			if(Config.pageApp == 'editor'){
-				var $folder = $(".curSelectedNode").parent().parent();
-				var fileNum = 0;
-				var zTree = ui.tree.zTree()
-				$folder.find('li[treenode]').each(function(){
-					var node = zTree.getNodeByTId($(this).attr('id'));
-					if(!node) return;
-
-					var thePath = node.path;
-					var ext = core.pathExt(node.path);
-					if(!kodApp.appSupportCheck('photoSwipe',ext)){
-						return;
-					}
-					if(thePath == imagePath){
-						index = fileNum;
-					}
-					fileNum ++;
-					items.push([
-						[imageUrl(thePath),imageUrl(thePath),thePath],
-						core.pathThis(thePath),[0,0],'',imageUrl(thePath,true)
-					]);
-				});
-			}else{
-				$('.file-continer .ico.picture').each(function(i){
-					var thumb = $(this).find('img').attr('data-original');
-					var thePath = hashDecode($(this).parents('.file').attr('data-path'));
-					if($(this).find('img').attr('data-src')){
-    					thePath = $(this).find('img').attr('data-src');
-    				}
-					if(thePath == imagePath){
-						index = i;
-					}
-					items.push([
-						[thumb,imageUrl(thePath),thePath],
-						core.pathThis(thePath),[0,0],'',imageUrl(thePath,true)
-					]);
-				});
-			}
-		}
-		if(items.length == 0 || index == -1){
-		    items = [[[imageUrl(imagePath),imageUrl(imagePath),imagePath],
-					 core.pathThis(urlDecode(imagePath)),[0,0],'']];
-			index = 0;
-		}
-		return {items:items,index:index};
-	}
-
+		// console.log(7777,$images,itemsArr);
+		return {items:itemsArr,index:index};
+	};
+	
 	//播放幻灯片时，删除图片.
 	var removeImageRequest = function(path,callback){
-		ui.pathOperate.remove([{type:"file",path:path}],function(result){
-			if(!result || !result.code){
-				return;
-			}
-			ui.fileLight.clear();
-			ui.f5Callback(function() {
-				callback();
-			});
-		})
+		callback();
 	};
 	var removeImage = function(){
 		var index = parseInt($('#PV_Control #PV_Items .current').attr('number'));
@@ -113,14 +71,16 @@ define(function(require, exports) {
 	var loadImageBefore = function(){
 	    var index = parseInt($('#PV_Control #PV_Items .current').attr('number'));
 		var path = myPicasa.arrItems[index][0][2];
+		var $action = $("#PV_rotate_Left,#PV_rotate_Right,#PV_Btn_Remove");
 		if(path.substr(0,4) == 'http'){
-		    $("#PV_rotate_Left,#PV_rotate_Right,#PV_Btn_Remove").addClass('hidden');
+		    $action.addClass('hidden');
 		}else{
-		    $("#PV_rotate_Left,#PV_rotate_Right,#PV_Btn_Remove").removeClass('hidden');
+		    $action.removeClass('hidden');
 		}
-	}
-	return function(imagePath,appStatic){
-		require.async([
+	};
+	
+	return function(path,ext,name,appStatic){
+		requireAsync([
 			appStatic+'picasa/style/style.css',
 			appStatic+'picasa/picasa.js'
 		],function(){
@@ -130,9 +90,13 @@ define(function(require, exports) {
 				myPicasa.imageRotate = imageRotate;
 				myPicasa.loadImageBefore = loadImageBefore;
 			}
-			var images = getImageArr(imagePath);
+			var images = getImageArr(path,name);
 			myPicasa.play(images.items,images.index);
+			setTimeout(() => {
+				$('#PicasaView').attr('tabindex','10').focus();
+			},100);
 		});
-	}	
+	};
+	
 });
 

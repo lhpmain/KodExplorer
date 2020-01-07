@@ -20,11 +20,7 @@ define(function(require, exports) {
 			video: {
 				url:vedioInfo.url,
 				type:type
-			},			
-			// danmaku: {
-			// 	id:md5(vedioInfo.url),
-			// 	api:'https://api.prprpr.me/dplayer/'
-			// },
+			},
 			contextmenu: [
 				{
 					text: 'kodcloud官网',
@@ -32,12 +28,6 @@ define(function(require, exports) {
 				}
 			]
 		};
-		if(window.DplayerSubtitle){
-			// 默认加载同名文件字幕;暂时只支持vtt格式  http://dplayer.js.org/#/home?id=options
-			playerOption.subtitle = {
-				url:core.path2url(vedioInfo.path+'.vtt')
-			}
-		}
 		new DPlayer(playerOption);
 	}
 	var createDialog = function(title,ext){
@@ -46,7 +36,6 @@ define(function(require, exports) {
 			size  = {width:'320px',height:'420px'};
 		}
 		var dialog = $.dialog({
-			//id:'movie-dialog',
 			simple:true,
 			ico:core.icon('mp4'),
 			title:title,
@@ -56,26 +45,22 @@ define(function(require, exports) {
 			resize:true,
 			padding:0,
 			fixed:true,
-			close:function(){
-			}
+			close:function(){}
 		});
 		dialog.DOM.wrap.addClass('dplayer-dialog');
 		return dialog.DOM.wrap.find(".Dplayer");
 	}
-	
-	
+
 	var playReady = function(appStatic,vedioInfo){
-		require.async([
+		requireAsync([
 			appStatic+'DPlayer/lib/flv.min.js',
 			appStatic+'DPlayer/lib/hls.min.js',
 			appStatic+'DPlayer/lib/dash.all.min.js',
 			appStatic+'DPlayer/DPlayer.min.css',
 			appStatic+'DPlayer/DPlayer.min.js',
-			],function(a){
+			],function(){
 			playStart(vedioInfo);
 		});
 	}
-	return {
-		play:playReady
-	};
+	return playReady;
 });

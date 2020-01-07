@@ -14,9 +14,9 @@
 	"configItem":{
 		"pluginAuth":{
 			"type":"userSelect",
-			"value":"all:1",
-			"display":"{{LNG.Plugin.config.auth}}",
-			"desc":"{{LNG.Plugin.config.authDesc}}",
+			"value":{"all":1},
+			"display":"{{LNG['admin.plugin.auth']}}",
+			"desc":"{{LNG['admin.plugin.authDesc']}}",
 			"require":1
 		}
 	}

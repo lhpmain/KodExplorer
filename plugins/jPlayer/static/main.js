@@ -1,4 +1,5 @@
 kodReady.push(function(){
+	var browserIsWap = $.isWap;
 	var playerSupport = function(){
 		var support = {
 			wap:{//移动端
@@ -16,15 +17,15 @@ kodReady.push(function(){
 			//safari 已经禁用了flash
 		};
 		var res = support.chrome;
-		if(isWap()){
+		if(browserIsWap){
 			res = support.wap;
 		}else if(!!window.ActiveXObject || "ActiveXObject" in window){
 			res = support.ie;
 		}
-		return res.music.join(',') + ',' + res.movie.join(',');
+		var inits = _.union(res.music, res.movie);
+		var fileExt = "{{config.fileExt}}" ? "{{config.fileExt}}".split(",") : [];
+		return _.intersection(inits, fileExt).join(',');
 	}
-	//'mp3,wav,m4a,aac,oga,ogg,webma,mp4,m4v,flv,mov,f4v,ogv,webm,webmv'
-
 	var myPlayer;
 	var loadMyPlayer = function(callback){
 		var appStatic = "{{pluginHost}}static/";
@@ -33,7 +34,7 @@ kodReady.push(function(){
 			callback(myPlayer);
 		}else{
 			var top = ShareData.frameTop();
-			top.require.async(appStatic+'page.js',function(app){
+			top.requireAsync(appStatic+'page.js',function(app){
 				if(!myPlayer){
 					myPlayer = app;
 					myPlayer.init(appStatic,appStaticDefault);
@@ -43,45 +44,44 @@ kodReady.push(function(){
 		}
 	};
 
-	kodApp.add({
-		name:"jPlayer",
-		title:LNG['Plugin.default.jPlayer'],
-		ext:playerSupport(),
-		//ext:"{{config.fileExt}}",
-		sort:"{{config.fileSort}}",
-		icon:'{{pluginHost}}static/images/icon.png',
-		callback:function(path,ext){
-			var music = ['mp3','wav','aac','m4a','oga','ogg','webma','m3u8a','m3ua','flac'];
-			if(isWap() && $.inArray(ext, music) == -1  && G.ACT != 'file' ){ //移动端，非视频文件分享页面用跳转方式打开
-				return window.open(core.path2url(path));
-			}
-			var list = [{
-				url:core.path2url(path),
-				name:urlDecode(core.pathThis(path)),//zip内文件播放
-				ext:ext
-			}];
+	Events.bind('explorer.kodApp.before',function(appList){
+		appList.push({
+			name:"jPlayer",
+			title:LNG['admin.plugin.defaultJPlayer'],
+			ext:playerSupport(),
+			//ext:"{{config.fileExt}}",
+			sort:"{{config.fileSort}}",
+			icon:'{{pluginHost}}static/images/icon.png',
+			callback:function(path,ext,name){
+				var music = ['mp3','wav','aac','m4a','oga','ogg','webma','m3u8a','m3ua','flac'];
+				if(browserIsWap && $.inArray(ext, music) == -1){ //移动端，非视频文件分享页面用跳转方式打开
+					return core.openWindow(core.path2url(path));
+				}
+				var list = [{
+					url:core.path2url(path),
+					name:name,//zip内文件播放
+					ext:ext
+				}];
 
-			if(isWap() && !window.jplayerInit){
-				window.jplayerInit = true;
-				$(".jPlayer-music .play-list .remove").trigger("click");
-				$.addStyle('.music-player-dialog{visibility:visible;}');
+				if(browserIsWap && !window.jplayerInit){
+					window.jplayerInit = true;
+					$(".jPlayer-music .play-list .remove").trigger("click");
+					$.addStyle('.music-player-dialog{visibility:visible;}');
+				}
+				loadMyPlayer(function(player){
+					player.play(list);
+				});
 			}
-			loadMyPlayer(function(player){
-				player.play(list);
-			});
-		}
+		});
 	});
 
 	// 移动端安卓首次打开播放器不自动播放问题处理；
-	if(isWap()){
+	if(browserIsWap){
 		$.addStyle('.music-player-dialog{visibility:hidden;}');
-		// loadMyPlayer(function(player){
-		// 	player.play([{url:"",name:"",ext:"mp3"}]);
-		// });
 	}
 
 	//音效播放绑定
-	Hook.bind('playSound',function(url){
+	Events.bind('playSound',function(url){
 		loadMyPlayer(function(player){
 			player.playSound(url);
 		});
@@ -91,9 +91,9 @@ kodReady.push(function(){
 	//多选含有音乐右键菜单
 	var menuOpt = {
 		'play-media':{
-			name:LNG.add_to_play,
+			name:LNG['explorer.addToPlay'],
 			className:"play-media hidden",
-			icon:"x-item-file x-mp3",
+			icon:"x-item-icon x-mp3",
 			accesskey: "p",
 			callback:function(action,option){
 				if (ui.fileLight.fileListSelect().length <1) return;
@@ -116,15 +116,15 @@ kodReady.push(function(){
 			}
 		}
 	}
-	$.contextMenu.menuAdd(menuOpt,'.menu-more',false,'.clone');
+	$.contextMenu.menuAdd(menuOpt,'.menu-path-more',false,'.clone');
 
 
 	//多选含有音乐检测；添加到音乐列表
-	Hook.bind('rightMenu.show.menu-more',function($menuAt,$theMenu){
+	Events.bind('rightMenu.show.menu-path-more',function($menuAt,$theMenu){
 		var needMenu  = 0;
 		var hideClass = 'hidden';
 		ui.fileLight.fileListSelect().each(function(){
-			var ext = core.pathExt(ui.fileLight.name($(this)));
+			var ext = pathTools.pathExt(ui.fileLight.name($(this)));
 			if ( kodApp.appSupportCheck('jPlayer',ext) ){
 				needMenu +=1;
 			}

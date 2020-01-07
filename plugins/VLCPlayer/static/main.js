@@ -1,37 +1,39 @@
 kodReady.push(function(){
-	kodApp.add({
-		name:"VLCPlayer",
-		title:LNG['Plugin.default.VLCPlayer'],
-		ext:"{{config.fileExt}}",
-		sort:"{{config.fileSort}}",
-		icon:'{{pluginHost}}static/images/icon.png',
-		callback:function(path,ext){
-			if(isWap()){//ios不支持文件下载
-				window.open(core.path2url(path));
-				return;
-			}
-			var dialog = $.dialog({
-				ico:core.icon(ext),
-				title:urlDecode(core.pathThis(path)),
-				animate:false,
-				width:750,
-				height:450,
-				content:makePlayer(core.path2url(path)),
-				resize:true,
-				padding:0,
-				fixed:true
-			});
-			$('.VLCPlayer-dialog embed').css('background','#000');
-
-			setTimeout(function() {
-				var vlc = getVLC("vlc");
-				if(!vlc || !vlc.playlist){
-					dialog.DOM.wrap.find('.error-tips').removeClass('hidden');
+	Events.bind('explorer.kodApp.before',function(appList){
+		appList.push({
+			name:"VLCPlayer",
+			title:LNG['Plugin.default.VLCPlayer'],
+			ext:"{{config.fileExt}}",
+			sort:"{{config.fileSort}}",
+			icon:'{{pluginHost}}static/images/icon.png',
+			callback:function(path,ext,name){
+				if($.isWap){//ios不支持文件下载
+					core.openWindow(core.path2url(path));
+					return;
 				}
-				dialog._clickMax();
-				dialog._clickMax();
-			},500);
-		}
+				var dialog = $.dialog({
+					ico:core.icon(ext),
+					title:name,
+					animate:false,
+					width:750,
+					height:450,
+					content:makePlayer(core.path2url(path)),
+					resize:true,
+					padding:0,
+					fixed:true
+				});
+				$('.VLCPlayer-dialog embed').css('background','#000');
+
+				setTimeout(function() {
+					var vlc = getVLC("vlc");
+					if(!vlc || !vlc.playlist){
+						dialog.DOM.wrap.find('.error-tips').removeClass('hidden');
+					}
+					dialog._clickMax();
+					dialog._clickMax();
+				},500);
+			}
+		});
 	});
 
 
